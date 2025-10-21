@@ -18,7 +18,10 @@
 
     <script type="module">
       const grid = document.getElementById("grid");
-      const socket = new WebSocket("ws://localhost:3000");
+      const socket = new WebSocket(
+  window.location.protocol.replace("http", "ws") + "//" + window.location.host
+);
+
       const cards = new Map();
       const tradeHistories = new Map();
       const profits = new Map(); // store { secondProfit, dailyProfit }
