@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Robinhood Live OCR Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <h1>📊 Robinhood Live OCR Dashboard</h1>
+      <p>Real-time stream of your trading performance.</p>
+    </header>
+
+    <main>
+      <div id="grid" class="grid"></div>
+    </main>
+
+    <script type="module">
+      const grid = document.getElementById("grid");
+      const socket = new WebSocket("ws://localhost:3000");
+      const cards = new Map();
+      const tradeHistories = new Map();
+      const profits = new Map(); // store { secondProfit, dailyProfit }
+
+      socket.addEventListener("message", (event) => {
+        const data = JSON.parse(event.data);
+        renderOrUpdateCard(data);
+      });
+
+      function renderOrUpdateCard({ name, price, bought, sold, profit, profitToday, timestamp }) {
+        let card = cards.get(name);
+        let history = tradeHistories.get(name) || [];
+        let symbolProfit = profits.get(name) || { secondProfit: 0, dailyProfit: 0 };
+
+        // Use scraped profitToday if available, otherwise accumulate manually
+        const currentProfit = (sold ?? 0) - (bought ?? 0);
+        symbolProfit.secondProfit = currentProfit;
+
+        if (typeof profitToday === "number" && !isNaN(profitToday)) {
+          symbolProfit.dailyProfit = profitToday;
+        } else {
+          symbolProfit.dailyProfit += currentProfit;
+        }
+
+        profits.set(name, symbolProfit);
+
+        // push to trade history (keep 20 latest)
+        history.unshift({
+          bought,
+          sold,
+          profit: currentProfit,
+          timestamp: new Date(timestamp).toLocaleTimeString(),
+        });
+        if (history.length > 20) history.pop();
+        tradeHistories.set(name, history);
+
+        // determine direction
+        const lastEntry = history[1];
+        let direction = "";
+        if (lastEntry && price > lastEntry.sold) direction = "up";
+        else if (lastEntry && price < lastEntry.sold) direction = "down";
+
+        if (!card) {
+          card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div class="card-header">
+              <div class="symbol">${name}</div>
+              <div class="title">${name} Inc.</div>
+            </div>
+            <div class="price-section">
+              <div class="price">$${price.toFixed(2)}</div>
+              <div class="direction ${direction}">
+                ${direction === "up" ? "↑ Up • Strong" : direction === "down" ? "↓ Down • Weak" : "—"}
+              </div>
+            </div>
+            <div class="info">
+              <div class="bought">Bought at $${bought ?? "—"}</div>
+              <div class="sold">Sold at $${sold ?? "—"}</div>
+            </div>
+            <div class="profit">
+              <div>Profit (1s): <span class="second">${symbolProfit.secondProfit >= 0 ? "+" : ""}${symbolProfit.secondProfit.toFixed(2)}</span></div>
+              <div>Profit (Today): <span class="daily">${symbolProfit.dailyProfit >= 0 ? "+" : ""}${symbolProfit.dailyProfit.toFixed(2)}</span></div>
+              <div>Market Change (Today): <span class="market">${profitToday ? profitToday : "—"}</span></div>
+            </div>
+            <div class="history">
+              <h4>Trade History</h4>
+              <div class="history-wrapper"><ul></ul></div>
+            </div>
+          `;
+          grid.prepend(card);
+          cards.set(name, card);
+        } else {
+          const priceEl = card.querySelector(".price");
+          const directionEl = card.querySelector(".direction");
+          const secondEl = card.querySelector(".second");
+          const dailyEl = card.querySelector(".daily");
+          const marketEl = card.querySelector(".market");
+
+          priceEl.textContent = `$${price.toFixed(2)}`;
+          directionEl.textContent =
+            direction === "up"
+              ? "↑ Up • Strong"
+              : direction === "down"
+              ? "↓ Down • Weak"
+              : "—";
+          directionEl.className = `direction ${direction}`;
+
+          secondEl.textContent = `${symbolProfit.secondProfit >= 0 ? "+" : ""}${symbolProfit.secondProfit.toFixed(2)}`;
+          dailyEl.textContent = `${symbolProfit.dailyProfit >= 0 ? "+" : ""}${symbolProfit.dailyProfit.toFixed(2)}`;
+          marketEl.textContent = profitToday ? profitToday : "—";
+
+          secondEl.className = `second ${symbolProfit.secondProfit >= 0 ? "gain" : "loss"}`;
+          dailyEl.className = `daily ${symbolProfit.dailyProfit >= 0 ? "gain" : "loss"}`;
+          marketEl.textContent = profitToday ? profitToday : "—";
+if (profitToday && typeof profitToday === "string") {
+  if (profitToday.trim().startsWith("-")) {
+    marketEl.style.color = "#e63946"; // red for loss
+  } else if (profitToday.trim().startsWith("+")) {
+    marketEl.style.color = "#06d6a0"; // green for gain
+  } else {
+    marketEl.style.color = "inherit"; // neutral
+  }
+} else {
+  marketEl.style.color = "inherit";
+}
+
+          card.querySelector(".bought").textContent = `Bought at $${bought ?? "—"}`;
+          card.querySelector(".sold").textContent = `Sold at $${sold ?? "—"}`;
+        }
+
+        // rebuild trade history
+        const historyList = card.querySelector(".history ul");
+        historyList.innerHTML = history
+          .map(
+            (h) => `
+              <li>
+                <strong>Bought:</strong> $${h.bought ?? "—"} |
+                <strong>Sold:</strong> $${h.sold ?? "—"}
+                <span>${h.timestamp}</span>
+              </li>`
+          )
+          .join("");
+      }
+    </script>
+  </body>
+</html>
+
