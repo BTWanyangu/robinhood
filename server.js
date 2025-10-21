@@ -14,6 +14,7 @@ app.use(
     origin: [
       "chrome-extension://fojfmnlkoopabheombodngkpajcjmhlk", // your extension ID
       "http://localhost:3000", // for testing
+      "https://robinhood-live-tracker.onrender.com",
     ],
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type"],
@@ -39,8 +40,9 @@ wss.on("connection", (ws) => {
 
 // Create HTTP server to upgrade to WebSocket
 const server = app.listen(PORT, () =>
-  console.log(`🚀 Server running on http://localhost:${PORT}`)
+ console.log(`🚀 Server running on port ${PORT}`)
 );
+console.log(`🌐 App should be live at your Railway service URL`);
 
 server.on("upgrade", (req, socket, head) => {
   wss.handleUpgrade(req, socket, head, (ws) => {
@@ -62,6 +64,7 @@ app.post("/api/data", (req, res) => {
 
   res.json({ ok: true });
 });
-app.get("*", (req, res) => {
+// Catch-all route for frontend
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
