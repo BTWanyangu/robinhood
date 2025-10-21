@@ -14,6 +14,7 @@ app.use(
     origin: [
       "chrome-extension://fojfmnlkoopabheombodngkpajcjmhlk", // your extension ID
       "http://localhost:3000", // for testing
+      "https://robinhood-live-tracker.onrender.com",
     ],
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type"],
