@@ -1,149 +1,334 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Robinhood Live OCR Dashboard</title>
-    <link rel="stylesheet" href="style.css">
-  </head>
-  <body>
-    <header>
-      <h1>📊 Robinhood Live OCR Dashboard</h1>
-      <p>Real-time stream of your trading performance.</p>
-    </header>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Robinhood Live OCR Dashboard — Glassmorphism UI</title>
+  <style>
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.08);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --accent-green: #00ffa3;
+      --accent-yellow: #eaff00;
+      --accent-red: #ff6b6b;
+      --text-main: #f2f2f2;
+      --blur: 20px;
+    }
 
-    <main>
-      <div id="grid" class="grid"></div>
-    </main>
+    * { box-sizing: border-box; font-family: Inter, system-ui, sans-serif; }
+    html, body {
+      height: 100%; margin: 0;
+      background: radial-gradient(circle at 30% 20%, #0a0a0d, #000);
+      color: var(--text-main);
+    }
 
-    <script type="module">
-      const grid = document.getElementById("grid");
-      const socket = new WebSocket("ws://localhost:3000");
-      const cards = new Map();
-      const tradeHistories = new Map();
-      const profits = new Map(); // store { secondProfit, dailyProfit }
+    header { text-align: center; padding: 18px; border-bottom: 1px solid rgba(255,255,255,0.05); backdrop-filter: blur(var(--blur)); }
+    header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: var(--accent-green); }
+    header p { margin: 4px 0 0; font-size: 0.85rem; opacity: 0.8; }
 
-      socket.addEventListener("message", (event) => {
-        const data = JSON.parse(event.data);
-        renderOrUpdateCard(data);
-      });
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(380px, 440px));
+      justify-content: center;
+      gap: 24px;
+      padding: 24px;
+    }
 
-      function renderOrUpdateCard({ name, price, bought, sold, profit, profitToday, timestamp }) {
-        let card = cards.get(name);
-        let history = tradeHistories.get(name) || [];
-        let symbolProfit = profits.get(name) || { secondProfit: 0, dailyProfit: 0 };
+    .card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 22px;
+      padding: 18px 20px;
+      backdrop-filter: blur(var(--blur));
+      box-shadow: 0 0 40px rgba(0,0,0,0.4), inset 0 0 12px rgba(255,255,255,0.04);
+      transition: transform 0.2s ease, box-shadow 0.3s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 50px rgba(0,0,0,0.5), inset 0 0 16px rgba(255,255,255,0.08);
+    }
 
-        // Use scraped profitToday if available, otherwise accumulate manually
-        const currentProfit = (sold ?? 0) - (bought ?? 0);
-        symbolProfit.secondProfit = currentProfit;
+    .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 
-        if (typeof profitToday === "number" && !isNaN(profitToday)) {
-          symbolProfit.dailyProfit = profitToday;
-        } else {
-          symbolProfit.dailyProfit += currentProfit;
-        }
+    .grab-pill {
+      display: inline-flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 8px 16px;
+      background: #eaff00; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 999px; color: black; font-weight: 600; font-size: 0.85rem;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
 
-        profits.set(name, symbolProfit);
+    .controls { display: flex; align-items: center; gap: 8px; }
+    .controls input[type="number"], .controls select {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-main); padding: 6px 10px; border-radius: 8px;
+      width: 70px; font-size: 0.85rem; font-weight: 600;
+    }
 
-        // push to trade history (keep 20 latest)
-        history.unshift({
-          bought,
-          sold,
-          profit: currentProfit,
-          timestamp: new Date(timestamp).toLocaleTimeString(),
-        });
-        if (history.length > 20) history.pop();
-        tradeHistories.set(name, history);
+    .toggle-pill {
+      cursor: pointer; border-radius: 999px; padding: 6px 16px;
+      font-weight: 800; font-size: 0.8rem; transition: all 0.3s ease;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .toggle-pill.on { background: #eaff00; box-shadow: 0 0 10px rgba(234,255,0,0.4); color: black; }
+    .toggle-pill.off { background: rgba(255,255,255,0.05); color: #aaa; }
 
-        // determine direction
-        const lastEntry = history[1];
-        let direction = "";
-        if (lastEntry && price > lastEntry.sold) direction = "up";
-        else if (lastEntry && price < lastEntry.sold) direction = "down";
+    .symbol-title { font-size: 1.6rem; font-weight: 800; color: var(--accent-green); margin-bottom: 8px; }
+    .price-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 16px; background: rgba(255,255,255,0.04);
+      border-radius: 14px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.08);
+    }
 
-        if (!card) {
-          card = document.createElement("div");
-          card.className = "card";
-          card.innerHTML = `
-            <div class="card-header">
-              <div class="symbol">${name}</div>
-              <div class="title">${name} Inc.</div>
-            </div>
-            <div class="price-section">
-              <div class="price">$${price.toFixed(2)}</div>
-              <div class="direction ${direction}">
-                ${direction === "up" ? "↑ Up • Strong" : direction === "down" ? "↓ Down • Weak" : "—"}
-              </div>
-            </div>
-            <div class="info">
-              <div class="bought">Bought at $${bought ?? "—"}</div>
-              <div class="sold">Sold at $${sold ?? "—"}</div>
-            </div>
-            <div class="profit">
-              <div>Profit (1s): <span class="second">${symbolProfit.secondProfit >= 0 ? "+" : ""}${symbolProfit.secondProfit.toFixed(2)}</span></div>
-              <div>Profit (Today): <span class="daily">${symbolProfit.dailyProfit >= 0 ? "+" : ""}${symbolProfit.dailyProfit.toFixed(2)}</span></div>
-              <div>Market Change (Today): <span class="market">${profitToday ? profitToday : "—"}</span></div>
-            </div>
-            <div class="history">
-              <h4>Trade History</h4>
-              <div class="history-wrapper"><ul></ul></div>
-            </div>
-          `;
-          grid.prepend(card);
-          cards.set(name, card);
-        } else {
-          const priceEl = card.querySelector(".price");
-          const directionEl = card.querySelector(".direction");
-          const secondEl = card.querySelector(".second");
-          const dailyEl = card.querySelector(".daily");
-          const marketEl = card.querySelector(".market");
+    .price-row .price { font-size: 1.8rem; font-weight: 900; }
+    .direction-pill {
+      padding: 6px 12px; border-radius: 999px; font-weight: 800; font-size: 0.85rem;
+    }
+    .direction-pill.up { background: rgba(0,255,163,0.1); color: var(--accent-green); }
+    .direction-pill.down { background: rgba(255,107,107,0.1); color: var(--accent-red); }
 
-          priceEl.textContent = `$${price.toFixed(2)}`;
-          directionEl.textContent =
-            direction === "up"
-              ? "↑ Up • Strong"
-              : direction === "down"
-              ? "↓ Down • Weak"
-              : "—";
-          directionEl.className = `direction ${direction}`;
+    .status { display: grid; gap: 6px; margin-bottom: 12px; font-size: 0.9rem; }
+    .profit-pill { background: #eaff00; color: #000; padding: 10px 18px; border-radius: 999px; font-weight: 900; display: inline-block; }
 
-          secondEl.textContent = `${symbolProfit.secondProfit >= 0 ? "+" : ""}${symbolProfit.secondProfit.toFixed(2)}`;
-          dailyEl.textContent = `${symbolProfit.dailyProfit >= 0 ? "+" : ""}${symbolProfit.dailyProfit.toFixed(2)}`;
-          marketEl.textContent = profitToday ? profitToday : "—";
+    .summary { display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.85rem; opacity: 0.85; }
+    .history { margin-top: 16px; }
+    .history .scroll {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding: 12px;
+    }
 
-          secondEl.className = `second ${symbolProfit.secondProfit >= 0 ? "gain" : "loss"}`;
-          dailyEl.className = `daily ${symbolProfit.dailyProfit >= 0 ? "gain" : "loss"}`;
-          marketEl.textContent = profitToday ? profitToday : "—";
-if (profitToday && typeof profitToday === "string") {
-  if (profitToday.trim().startsWith("-")) {
-    marketEl.style.color = "#e63946"; // red for loss
-  } else if (profitToday.trim().startsWith("+")) {
-    marketEl.style.color = "#06d6a0"; // green for gain
-  } else {
-    marketEl.style.color = "inherit"; // neutral
+    .history ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+    .history li {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .gain { color: var(--accent-green); }
+    .loss { color: var(--accent-red); }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 999px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📈 Robinhood Live OCR Dashboard</h1>
+    <p>Real-time stream — Glassmorphism Edition</p>
+  </header>
+
+  <main><div class="grid" id="grid"></div></main>
+
+  <script type="module">
+  const grid = document.getElementById("grid");
+  const cards = new Map();
+
+  // Handle payload from WebSocket
+  function handlePayload(payload) {
+    if (!payload?.name) return;
+    ensureCard(payload.name);
+    const st = cards.get(payload.name);
+
+    // Choose a usable price field
+    st.latestPrice = typeof payload.sold === "number"
+      ? payload.sold
+      : typeof payload.bought === "number"
+      ? payload.bought
+      : 0;
+
+    st.direction = payload.direction || "";
+    st.profitToday = payload.profitToday || "";
+    updateCard(st);
   }
-} else {
-  marketEl.style.color = "inherit";
-}
 
-          card.querySelector(".bought").textContent = `Bought at $${bought ?? "—"}`;
-          card.querySelector(".sold").textContent = `Sold at $${sold ?? "—"}`;
-        }
+  // WebSocket setup
+  const wsUrl =
+    (window.location.protocol === "https:" ? "wss://" : "ws://") +
+    window.location.host;
+  const socket = new WebSocket(wsUrl);
+  socket.onmessage = (ev) => handlePayload(JSON.parse(ev.data));
 
-        // rebuild trade history
-        const historyList = card.querySelector(".history ul");
-        historyList.innerHTML = history
-          .map(
-            (h) => `
-              <li>
-                <strong>Bought:</strong> $${h.bought ?? "—"} |
-                <strong>Sold:</strong> $${h.sold ?? "—"}
-                <span>${h.timestamp}</span>
-              </li>`
-          )
-          .join("");
+  function ensureCard(name) {
+    if (cards.has(name)) return;
+    const st = createCard(name);
+    cards.set(name, st);
+    grid.appendChild(st.dom.container);
+  }
+
+  function createCard(symbol) {
+    const container = document.createElement("div");
+    container.className = "card";
+    container.innerHTML = `
+      <div class="topbar">
+        <div class="grab-pill"><div class="label">Grab</div><div class="dot"></div></div>
+        <div class="controls">
+          <input type="number" class="duration" min="1" value="10">
+          <select class="unit"><option value="s">s</option><option value="m">mins</option><option value="h">hours</option></select>
+          <div class="toggle-pill off">OFF</div>
+        </div>
+      </div>
+      <div class="symbol-title">${symbol.toUpperCase()}</div>
+      <div class="price-row">
+        <div class="price">$0.00</div>
+        <div class="direction-pill">—</div>
+      </div>
+      <div class="status">
+        <div><strong>Bought Stock:</strong> <span class="bought">—</span> <small class="bought-time"></small></div>
+        <div><strong>Sold Stock:</strong> <span class="sold">—</span> <small class="sold-time"></small></div>
+        <div class="profit-pill">Total Profit: <span class="total">$0.00</span></div>
+      </div>
+      <div class="summary"><div>Winners: <b class="winners">0</b></div><div>Loses: <b class="loses">0</b></div></div>
+      <div class="history"><div class="scroll"><ul></ul></div></div>
+    `;
+
+    const dom = {
+      container,
+      toggle: container.querySelector(".toggle-pill"),
+      duration: container.querySelector(".duration"),
+      unit: container.querySelector(".unit"),
+      price: container.querySelector(".price"),
+      direction: container.querySelector(".direction-pill"),
+      bought: container.querySelector(".bought"),
+      sold: container.querySelector(".sold"),
+      boughtTime: container.querySelector(".bought-time"),
+      soldTime: container.querySelector(".sold-time"),
+      total: container.querySelector(".total"),
+      winners: container.querySelector(".winners"),
+      loses: container.querySelector(".loses"),
+      list: container.querySelector("ul"),
+    };
+
+    const st = {
+      symbol,
+      dom,
+      active: false,
+      holding: false,
+      boughtPrice: null,
+      boughtAt: null,
+      totalProfit: 0,
+      winners: 0,
+      loses: 0,
+      timer: null,
+      history: [],
+      latestPrice: 0,
+      direction: "",
+      profitToday: "",
+    };
+
+    dom.toggle.addEventListener("click", () => {
+      if (!st.active) {
+        st.active = true;
+        dom.toggle.classList.remove("off");
+        dom.toggle.classList.add("on");
+        dom.toggle.textContent = "ON";
+        startTradeCycle(st);
+      } else {
+        stopTradeCycle(st, true);
       }
-    </script>
-  </body>
-</html>
+    });
 
+    return st;
+  }
+
+  function updateCard(st) {
+    const price = st.latestPrice;
+    const prev = parseFloat(st.dom.price.textContent.replace(/[^0-9.\-]/g, "")) || 0;
+    st.dom.price.textContent = "$" + price.toFixed(2);
+
+    const dir = (st.direction || (price > prev ? "up" : price < prev ? "down" : "")).toLowerCase();
+    st.dom.direction.textContent =
+      dir === "up" ? `▲ Up` :
+      dir === "down" ? `▼ Down ` :
+      `— ${st.profitToday}`;
+    st.dom.direction.className = "direction-pill " + dir;
+  }
+
+  function startTradeCycle(st) {
+    if (!st.latestPrice) return;
+    st.holding = true;
+    st.boughtPrice = st.latestPrice;
+    st.boughtAt = Date.now();
+    st.dom.bought.textContent = "$" + st.boughtPrice.toFixed(2);
+    st.dom.boughtTime.textContent = "(" + new Date(st.boughtAt).toLocaleTimeString() + ")";
+
+    const val = parseInt(st.dom.duration.value || 10, 10);
+    const unit = st.dom.unit.value;
+    const ms = val * (unit === "s" ? 1000 : unit === "m" ? 60000 : 3600000);
+
+    st.timer = setTimeout(() => stopTradeCycle(st, false), ms);
+  }
+
+  function stopTradeCycle(st, manual = false) {
+    clearTimeout(st.timer);
+    st.timer = null;
+
+    if (!st.holding) {
+      st.active = false;
+      st.dom.toggle.classList.remove("on");
+      st.dom.toggle.classList.add("off");
+      st.dom.toggle.textContent = "OFF";
+      return;
+    }
+
+    const sold = st.latestPrice;
+    const soldAt = Date.now();
+    const profit = sold - st.boughtPrice;
+    const timeTaken = ((soldAt - st.boughtAt) / 1000).toFixed(1);
+
+    st.holding = false;
+    st.totalProfit += profit;
+    if (profit >= 0) st.winners++;
+    else st.loses++;
+
+    st.dom.sold.textContent = "$" + sold.toFixed(2);
+    st.dom.soldTime.textContent = "(" + new Date(soldAt).toLocaleTimeString() + ")";
+    st.dom.total.textContent = "$" + st.totalProfit.toFixed(2);
+    st.dom.winners.textContent = st.winners;
+    st.dom.loses.textContent = st.loses;
+
+    st.history.unshift({
+      b: st.boughtPrice,
+      s: sold,
+      p: profit,
+      t: timeTaken,
+      bt: st.boughtAt,
+      st: soldAt,
+    });
+    if (st.history.length > 40) st.history.pop();
+    renderHistory(st);
+
+    st.active = false;
+    st.dom.toggle.classList.remove("on");
+    st.dom.toggle.classList.add("off");
+    st.dom.toggle.textContent = "OFF";
+  }
+
+  function renderHistory(st) {
+    st.dom.list.innerHTML = st.history
+      .map(
+        (h) => `
+        <li>
+          <span>Bought <b>$${h.b.toFixed(2)}</b><br><small>${new Date(h.bt).toLocaleTimeString()}</small></span>
+          <span>Sold <b>$${h.s.toFixed(2)}</b><br><small>${new Date(h.st).toLocaleTimeString()}</small></span>
+          <span>Profit <b class="${h.p >= 0 ? "gain" : "loss"}">${h.p >= 0 ? "+" : "-"}$${Math.abs(h.p).toFixed(2)}</b></span>
+          <span><small>${h.t}s</small></span>
+        </li>`
+      )
+      .join("");
+  }
+
+  window.__feed = handlePayload;
+</script>
+
+</body>
+</html>

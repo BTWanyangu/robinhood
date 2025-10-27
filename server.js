@@ -15,6 +15,7 @@ app.use(
       "chrome-extension://fojfmnlkoopabheombodngkpajcjmhlk", // your extension ID
       "http://localhost:3000", // for testing
       "https://robinhood-live-tracker.onrender.com",
+      
     ],
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type"],
@@ -64,7 +65,7 @@ app.post("/api/data", (req, res) => {
 
   res.json({ ok: true });
 });
-// Catch-all route for frontend
-app.use((req, res) => {
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
+
