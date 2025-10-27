@@ -297,21 +297,27 @@
     st.dom.loses.textContent = st.loses;
 
     st.history.unshift({
-      b: st.boughtPrice,
-      s: sold,
-      p: profit,
-      t: timeTaken,
-      bt: st.boughtAt,
-      st: soldAt,
-    });
-    if (st.history.length > 40) st.history.pop();
-    renderHistory(st);
+  b: st.boughtPrice,
+  s: sold,
+  p: profit,
+  t: timeTaken,
+  bt: st.boughtAt,
+  st: soldAt,
+});
+if (st.history.length > 40) st.history.pop();
+renderHistory(st);
 
-    st.active = false;
-    st.dom.toggle.classList.remove("on");
-    st.dom.toggle.classList.add("off");
-    st.dom.toggle.textContent = "OFF";
-  }
+// ✅ Reset bought/sold display after trade
+st.dom.bought.textContent = "—";
+st.dom.sold.textContent = "—";
+st.dom.boughtTime.textContent = "";
+st.dom.soldTime.textContent = "";
+
+// Deactivate toggle
+st.active = false;
+st.dom.toggle.classList.remove("on");
+st.dom.toggle.classList.add("off");
+st.dom.toggle.textContent = "OFF";
 
   function renderHistory(st) {
     st.dom.list.innerHTML = st.history
